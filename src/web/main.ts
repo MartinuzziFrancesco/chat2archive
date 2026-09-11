@@ -1,5 +1,5 @@
 import { importAny } from "../importers/detect.js";
-import { buildPackage, zipPackage } from "../core/package.js";
+import { buildPackage, zipPackage, slugify } from "../core/package.js";
 import type { AirRecord, ImportResult } from "../core/model.js";
 
 // The Worker that fetches public ChatGPT share pages (GitHub Pages can't do
@@ -150,8 +150,7 @@ form.addEventListener("submit", async (event) => {
     const blob = new Blob([zipBytes as BlobPart], { type: "application/zip" });
     lastDownloadUrl = URL.createObjectURL(blob);
     downloadLink.href = lastDownloadUrl;
-    const slug = built.record.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "air-record";
-    downloadLink.download = `${slug}.zip`;
+    downloadLink.download = `${slugify(built.record.title)}.zip`;
 
     $("archive-title").textContent = built.record.title;
     const warnings = [...imported.warnings.map((warning) => warning.message), ...built.warnings];

@@ -99,13 +99,52 @@ export function importChatGptExport(
   const nodeIds = Object.keys(mapping);
   if (nodeIds.length === 0) throw new Error("ChatGPT export conversation has an empty mapping.");
 
-  const root = nodeIds.find((id) => !mapping[id]?.parent) ?? nodeIds[0]!;
+  // A node is a root if it has no parent, or its parent id doesn't resolve
+  // within this mapping (a dangling reference, which would otherwise make
+  // the node unreachable from anywhere and silently vanish from the archive).
+  const roots = nodeIds.filter((id) => {
+    const parentId = mapping[id]?.parent;
+    return !parentId || !mapping[parentId];
+  });
+  if (roots.length === 0) {
+    throw new Error(
+      "ChatGPT export conversation graph has no root node: every node has a parent, which means the graph is cyclic or malformed."
+    );
+  }
+
+  const reachableFrom = (rootId: string): Set<string> => {
+    const seen = new Set<string>();
+    const queue = [rootId];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      for (const childId of mapping[id]?.children ?? []) {
+        if (!seen.has(childId)) queue.push(childId);
+      }
+    }
+    return seen;
+  };
+
+  // Several exports carry a handful of orphaned/edited-out nodes alongside
+  // the real conversation; the real conversation is the largest connected
+  // component.
+  const mainRoot = roots.reduce((best, id) => (reachableFrom(id).size > reachableFrom(best).size ? id : best));
 
   const events: AirEvent[] = [];
+  const visited = new Set<string>();
+  const stack: { nodeId: string; parentEventId: string | null }[] = [{ nodeId: mainRoot, parentEventId: null }];
 
-  function visit(nodeId: string, parentEventId: string | null) {
+  while (stack.length > 0) {
+    const { nodeId, parentEventId } = stack.pop()!;
+    if (visited.has(nodeId)) {
+      throw new Error(
+        `ChatGPT export conversation graph is malformed: node "${nodeId}" is reachable more than once (a cycle or a shared child), which chat2archive cannot represent as a tree.`
+      );
+    }
+    visited.add(nodeId);
     const node = mapping[nodeId];
-    if (!node) return;
+    if (!node) continue;
     let thisEventParent = parentEventId;
 
     const msg = node.message;
@@ -125,18 +164,26 @@ export function importChatGptExport(
       thisEventParent = eventId;
     }
 
+    // Push in reverse so the stack still pops children in chronological
+    // order, matching the original depth-first recursive traversal.
     const children = [...node.children].sort((a, b) => {
       const ta = mapping[a]?.message?.create_time ?? 0;
       const tb = mapping[b]?.message?.create_time ?? 0;
       return ta - tb;
     });
-    for (const childId of children) visit(childId, thisEventParent);
+    for (let i = children.length - 1; i >= 0; i--) {
+      stack.push({ nodeId: children[i]!, parentEventId: thisEventParent });
+    }
   }
-
-  visit(root, null);
 
   if (events.length === 0) {
     throw new Error("ChatGPT export conversation contained no renderable messages.");
+  }
+
+  if (visited.size < nodeIds.length) {
+    warnings.push(
+      `${nodeIds.length - visited.size} node(s) in this ChatGPT export were not reachable from the main conversation and were not included in this archive.`
+    );
   }
 
   const record: AirRecord = {

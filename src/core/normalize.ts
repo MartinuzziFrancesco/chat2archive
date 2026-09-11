@@ -5,6 +5,8 @@ export interface ArchiveStats {
   branchCount: number;
   attachmentCount: number;
   toolCallCount: number;
+  /** ids of message events that start a branch (more than one sibling shares their parent). */
+  branchStarts: Set<string>;
 }
 
 /**
@@ -41,12 +43,19 @@ export function computeStats(events: AirEvent[]): ArchiveStats {
   for (const count of childCountByParent.values()) {
     if (count > 1) branchCount += count - 1;
   }
+  const branchStarts = new Set<string>();
+  for (const event of events) {
+    if (event.type !== "message") continue;
+    const key = event.parent ?? "__root__";
+    if ((childCountByParent.get(key) ?? 0) > 1) branchStarts.add(event.id);
+  }
 
   return {
     messageCount: events.filter((e) => e.type === "message").length,
     branchCount,
     attachmentCount: events.filter((e) => e.type === "attachment").length,
     toolCallCount: events.filter((e) => e.type === "tool_call").length,
+    branchStarts,
   };
 }
 

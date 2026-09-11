@@ -83,19 +83,26 @@ export function importClaudeExport(
   }
 
   const events: AirEvent[] = [];
-  let previousEventId: string | null = null;
   const lastEventIdByMessageUuid = new Map<string, string>();
+  // Cross-message parent links can't be resolved on the first pass: a
+  // message's parent_message_uuid may point to a message this loop hasn't
+  // reached yet (or, in a malformed export, to one that doesn't exist at
+  // all). Record each message's entry-point event here and patch its
+  // `parent` once every message has been assigned an id, instead of
+  // guessing by falling back to whatever event happened to come before it.
+  const pendingParentLinks: { msgUuid: string; eventId: string; parentMessageUuid: string | undefined }[] = [];
+  const droppedBlockTypes = new Map<string, number>();
 
   for (const msg of messages) {
     const role = msg.sender === "human" ? "user" : "assistant";
     const blocks = msg.content && msg.content.length > 0 ? msg.content : textOnlyBlocks(msg.text);
 
-    if (msg.parent_message_uuid !== undefined) {
-      previousEventId =
-        msg.parent_message_uuid === CLAUDE_ROOT_PARENT_SENTINEL
-          ? null
-          : lastEventIdByMessageUuid.get(msg.parent_message_uuid) ?? previousEventId;
-    }
+    let internalPrev: string | null = null;
+    let firstEventId: string | null = null;
+    const recordEvent = (eventId: string) => {
+      if (firstEventId === null) firstEventId = eventId;
+      internalPrev = eventId;
+    };
 
     const textBlocks: TextBlock[] = [];
     let messagePartIndex = 0;
@@ -108,13 +115,13 @@ export function importClaudeExport(
         id: eventId,
         type: "message",
         role,
-        parent: previousEventId,
+        parent: internalPrev,
         timestamp: msg.created_at ?? null,
         agent: role === "assistant" ? "agent-claude" : null,
         content: textBlocks.splice(0, textBlocks.length),
       };
       events.push(event);
-      previousEventId = eventId;
+      recordEvent(eventId);
     };
 
     for (const block of blocks) {
@@ -126,35 +133,72 @@ export function importClaudeExport(
         events.push({
           id: toolEventId,
           type: "tool_call",
-          parent: previousEventId,
+          parent: internalPrev,
           timestamp: msg.created_at ?? null,
           tool: block.name ?? "unknown",
           arguments: block.input,
           arguments_available: block.input !== undefined,
         });
-        previousEventId = toolEventId;
+        recordEvent(toolEventId);
       } else if (block.type === "tool_result") {
         flushMessage();
-        const toolCallRef = block.tool_use_id ? `tool-${block.tool_use_id}` : previousEventId ?? "unknown";
+        const toolCallRef = block.tool_use_id ? `tool-${block.tool_use_id}` : internalPrev ?? "unknown";
         const resultEventId = `toolresult-${block.tool_use_id ?? `${msg.uuid}-result`}`;
         events.push({
           id: resultEventId,
           type: "tool_result",
-          parent: previousEventId,
+          parent: internalPrev,
           timestamp: msg.created_at ?? null,
           tool_call: toolCallRef,
           result: block.content,
           result_available: block.content !== undefined,
         });
-        previousEventId = resultEventId;
+        recordEvent(resultEventId);
+      } else {
+        droppedBlockTypes.set(block.type, (droppedBlockTypes.get(block.type) ?? 0) + 1);
       }
     }
     flushMessage();
-    if (previousEventId !== null) lastEventIdByMessageUuid.set(msg.uuid, previousEventId);
+
+    if (firstEventId !== null) {
+      pendingParentLinks.push({ msgUuid: msg.uuid, eventId: firstEventId, parentMessageUuid: msg.parent_message_uuid });
+    }
+    if (internalPrev !== null) lastEventIdByMessageUuid.set(msg.uuid, internalPrev);
   }
 
   if (events.length === 0) {
     throw new Error("Claude export conversation contained no renderable messages.");
+  }
+
+  // Resolve each message's link to the rest of the graph now that every
+  // message has a known id, independent of the order messages appeared in.
+  const eventById = new Map(events.map((e) => [e.id, e]));
+  let sequentialPrev: string | null = null;
+  for (const { msgUuid, eventId, parentMessageUuid } of pendingParentLinks) {
+    const event = eventById.get(eventId)!;
+    if (parentMessageUuid === undefined) {
+      // This export format carries no branch info at all: chain sequentially.
+      event.parent = sequentialPrev;
+    } else if (parentMessageUuid === CLAUDE_ROOT_PARENT_SENTINEL) {
+      event.parent = null;
+    } else {
+      const resolved = lastEventIdByMessageUuid.get(parentMessageUuid);
+      if (resolved === undefined) {
+        warnings.push(
+          `Message "${msgUuid}" references parent "${parentMessageUuid}" which was not found in this export; recorded it as a root message instead of guessing its place in the conversation.`
+        );
+        event.parent = null;
+      } else {
+        event.parent = resolved;
+      }
+    }
+    sequentialPrev = lastEventIdByMessageUuid.get(msgUuid) ?? sequentialPrev;
+  }
+
+  for (const [type, count] of droppedBlockTypes) {
+    warnings.push(
+      `${count} content block(s) of type "${type}" are not yet representable in AIR events and were omitted from this record.`
+    );
   }
 
   const record: AirRecord = {

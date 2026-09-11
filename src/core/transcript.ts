@@ -1,5 +1,5 @@
 import type { AirEvent, AirRecord } from "./model.js";
-import { computeStats } from "./normalize.js";
+import type { ArchiveStats } from "./normalize.js";
 
 function agentName(record: AirRecord, agentId?: string | null): string | null {
   if (!agentId) return null;
@@ -13,29 +13,12 @@ function eventText(event: AirEvent): string {
     .join("\n");
 }
 
-function branchesIntoOf(events: AirEvent[]): Set<string> {
-  const childCountByParent = new Map<string, number>();
-  for (const e of events) {
-    if (e.type !== "message") continue;
-    const key = e.parent ?? "__root__";
-    childCountByParent.set(key, (childCountByParent.get(key) ?? 0) + 1);
-  }
-  const branchStarts = new Set<string>();
-  for (const e of events) {
-    if (e.type !== "message") continue;
-    const key = e.parent ?? "__root__";
-    if ((childCountByParent.get(key) ?? 0) > 1) branchStarts.add(e.id);
-  }
-  return branchStarts;
-}
-
 function roleLabel(role: string): string {
   return { user: "User", assistant: "Assistant", system: "System", tool: "Tool" }[role] ?? role;
 }
 
-export function renderTranscriptMarkdown(record: AirRecord): string {
-  const stats = computeStats(record.events);
-  const branchStarts = branchesIntoOf(record.events);
+export function renderTranscriptMarkdown(record: AirRecord, stats: ArchiveStats): string {
+  const branchStarts = stats.branchStarts;
   const lines: string[] = [];
 
   lines.push(`# ${record.title}`);
@@ -143,9 +126,8 @@ header p { color: #555; font-size: 0.9rem; }
 footer { border-top: 1px solid #ddd; margin-top: 2rem; padding-top: 1rem; color: #666; font-size: 0.8rem; }
 `;
 
-export function renderTranscriptHtml(record: AirRecord): string {
-  const stats = computeStats(record.events);
-  const branchStarts = branchesIntoOf(record.events);
+export function renderTranscriptHtml(record: AirRecord, stats: ArchiveStats): string {
+  const branchStarts = stats.branchStarts;
   const body: string[] = [];
 
   for (const event of record.events) {

@@ -22,6 +22,20 @@ const ROLE_LABELS: Record<string, Role> = {
 
 const LABEL_LINE = /^\s*([A-Za-z][A-Za-z0-9 _-]{0,20}):\s?(.*)$/;
 
+/**
+ * Drops fully-blank lines from the start/end of a message's buffered lines
+ * without touching leading/trailing whitespace *within* a real line (e.g. an
+ * indented code block as the first line of a message) — unlike a plain
+ * `.trim()` on the joined string, which strips that indentation too.
+ */
+function trimBlankLines(lines: string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start]!.trim().length === 0) start++;
+  while (end > start && lines[end - 1]!.trim().length === 0) end--;
+  return lines.slice(start, end);
+}
+
 export function importGenericTranscript(text: string, opts: { sourceUri?: string | null } = {}): ImportResult {
   const warnings: string[] = [];
   const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -34,9 +48,10 @@ export function importGenericTranscript(text: string, opts: { sourceUri?: string
 
   const flush = () => {
     if (currentRole === null) return;
-    const content = buffer.join("\n").trim();
+    const trimmed = trimBlankLines(buffer);
     buffer = [];
-    if (content.length === 0) return;
+    if (trimmed.length === 0) return;
+    const content = trimmed.join("\n");
     index += 1;
     const eventId = `msg-${String(index).padStart(3, "0")}`;
     const event: MessageEvent = {

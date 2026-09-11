@@ -54,6 +54,7 @@ export function importAny(
 ): DetectedImportResult {
   let jsonCandidate: unknown | undefined;
   let plainText: string | undefined;
+  let discardedZipFileCount = 0;
 
   if (input instanceof Uint8Array) {
     if (isZip(input)) {
@@ -65,6 +66,7 @@ export function importAny(
             "Expected an official ChatGPT or Claude data export archive."
         );
       }
+      discardedZipFileCount = Object.keys(files).filter((name) => !name.endsWith("/")).length - 1;
       jsonCandidate = JSON.parse(new TextDecoder().decode(found));
     } else {
       plainText = new TextDecoder().decode(input);
@@ -83,16 +85,23 @@ export function importAny(
 
   if (jsonCandidate !== undefined) {
     const shape = detectJsonShape(jsonCandidate);
+    let result: DetectedImportResult;
     if (shape === "chatgpt_export") {
-      return { detected: shape, ...importChatGptExport(jsonCandidate, opts) };
+      result = { detected: shape, ...importChatGptExport(jsonCandidate, opts) };
+    } else if (shape === "claude_export") {
+      result = { detected: shape, ...importClaudeExport(jsonCandidate, opts) };
+    } else {
+      throw new Error(
+        "Input parses as JSON but does not match a recognized ChatGPT or Claude export shape. " +
+          "Refusing to guess: pass a plain pasted transcript instead if this is not an official export."
+      );
     }
-    if (shape === "claude_export") {
-      return { detected: shape, ...importClaudeExport(jsonCandidate, opts) };
+    if (discardedZipFileCount > 0) {
+      result.warnings.push({
+        message: `The export ZIP contained ${discardedZipFileCount} additional file(s) (e.g. attachments) alongside conversations.json; chat2archive does not yet extract them into the archive.`,
+      });
     }
-    throw new Error(
-      "Input parses as JSON but does not match a recognized ChatGPT or Claude export shape. " +
-        "Refusing to guess: pass a plain pasted transcript instead if this is not an official export."
-    );
+    return result;
   }
 
   if (plainText !== undefined && plainText.trim().length > 0) {

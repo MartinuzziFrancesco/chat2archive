@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 import { importAny } from "../importers/detect.js";
-import { buildPackage, zipPackage } from "../core/package.js";
+import { buildPackage, zipPackage, slugify } from "../core/package.js";
 import { validatePackageFiles, filesFromZip } from "../core/validate.js";
 import type { AirRecord } from "../core/model.js";
 
@@ -200,11 +200,7 @@ async function runConvert(input: string, opts: CliOptions): Promise<void> {
 }
 
 function defaultOutputPath(title: string, format: "zip" | "directory"): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 60) || "air-record";
+  const slug = slugify(title);
   return format === "directory" ? slug : `${slug}.zip`;
 }
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { importChatGptSharePage, importClaudeSnapshot, chatGptShareUrl, claudeShareUrl, fetchShare } from "../src/importers/share.js";
+import { importChatGptSharePage, importClaudeSnapshot, chatGptShareUrl, claudeShareUrl, claudeSnapshotId, fetchShare } from "../src/importers/share.js";
 import { buildPackage, zipPackage } from "../src/core/package.js";
 import { filesFromZip, validatePackageFiles } from "../src/core/validate.js";
 
@@ -102,4 +102,9 @@ test("Claude snapshot importer rejects an empty or malformed response", () => {
 test("claudeShareUrl strips tracking params and validates the path", () => {
   assert.equal(claudeShareUrl(claudeUrl + "?x=1#y").href, claudeUrl);
   assert.throws(() => claudeShareUrl("https://claude.ai/chat/" + "a".repeat(36)));
+});
+
+test("claudeSnapshotId extracts the id with or without a trailing slash", () => {
+  assert.equal(claudeSnapshotId(claudeShareUrl(claudeUrl)), "077c2a1f-16a9-409a-b376-6b002689d007");
+  assert.equal(claudeSnapshotId(claudeShareUrl(claudeUrl + "/")), "077c2a1f-16a9-409a-b376-6b002689d007");
 });

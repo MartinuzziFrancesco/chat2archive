@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { importAny } from "../src/importers/detect.js";
 import { buildPackage, zipPackage } from "../src/core/package.js";
 import { validatePackageFiles, filesFromZip } from "../src/core/validate.js";
-import { generateRoCrateMetadata } from "../src/core/rocrate.js";
 import { generateDataCiteMetadata, generateZenodoMetadata } from "../src/core/datacite.js";
+import { sha256Hex } from "../src/core/hash.js";
 
 async function buildChatGptFixture() {
   const raw = readFileSync("fixtures/chatgpt/branching.json", "utf-8");
@@ -51,6 +51,16 @@ test("validation catches a tampered conversation.jsonl (hash mismatch)", async (
   assert.ok(result.errors.some((e) => e.includes("canonical_sha256") || e.includes("Hash mismatch")));
 });
 
+test("validation catches duplicate event ids in conversation.jsonl", async () => {
+  const built = await buildChatGptFixture();
+  const files = filesFromZip(zipPackage(built));
+  const dup = '{"id":"x","type":"message","role":"user","content":[]}\n';
+  files.set("conversation.jsonl", new TextEncoder().encode(dup + dup));
+  const result = await validatePackageFiles(files);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((e) => e.includes('Duplicate event id "x"')));
+});
+
 test("validation catches a missing required file", async () => {
   const built = await buildChatGptFixture();
   const files = new Map(built.files);
@@ -77,17 +87,53 @@ test("package validation applies the published metadata schema", async () => {
   assert.ok(result.errors.some((error) => error.includes("schema violation") && error.includes("title")));
 });
 
-test("ro-crate-metadata.json references every packaged file with a matching hash", async () => {
+test("validation rejects a falsy-but-valid air.json instead of skipping it", async () => {
   const built = await buildChatGptFixture();
-  const rocrate = generateRoCrateMetadata(
-    built.record,
-    [...built.files.keys()].map((path) => ({ path, sha256: "0".repeat(64) }))
-  );
+  for (const falsyJson of ["null", "false", "0"]) {
+    built.files.set("air.json", new TextEncoder().encode(falsyJson));
+    const result = await validatePackageFiles(built.files);
+    assert.equal(result.valid, false, `air.json = ${falsyJson} should fail validation`);
+    assert.ok(
+      result.errors.some((e) => e.includes("schema violation") || e.includes("Unsupported AIR version")),
+      `air.json = ${falsyJson} should report a schema/version error, got: ${result.errors.join("; ")}`
+    );
+  }
+});
+
+test("validation requires SHA256SUMS to cover every packaged file and rejects malformed lines", async () => {
+  const built = await buildChatGptFixture();
+
+  const emptySums = new Map(built.files);
+  emptySums.set("SHA256SUMS", new TextEncoder().encode(""));
+  const emptyResult = await validatePackageFiles(emptySums);
+  assert.equal(emptyResult.valid, false);
+  assert.ok(emptyResult.errors.some((e) => e.includes("SHA256SUMS is missing an entry for")));
+
+  const malformedSums = new Map(built.files);
+  malformedSums.set("SHA256SUMS", new TextEncoder().encode("not-a-valid-line\n"));
+  const malformedResult = await validatePackageFiles(malformedSums);
+  assert.equal(malformedResult.valid, false);
+  assert.ok(malformedResult.errors.some((e) => e.includes('does not match "<hash>  <path>" format')));
+});
+
+test("ro-crate-metadata.json references every packaged file with its actual hash", async () => {
+  const built = await buildChatGptFixture();
+  const rocrate = JSON.parse(new TextDecoder().decode(built.files.get("ro-crate-metadata.json")));
   const graph = rocrate["@graph"] as Array<Record<string, unknown>>;
   const root = graph.find((n) => n["@id"] === "./")!;
-  const hasPart = root.hasPart as Array<{ "@id": string }>;
-  for (const path of built.files.keys()) {
-    assert.ok(hasPart.some((p) => p["@id"] === path), `ro-crate hasPart missing ${path}`);
+  const hasPart = (root.hasPart as Array<{ "@id": string }>).map((p) => p["@id"]);
+  const fileHashes = new Map(
+    graph.filter((n) => n["@type"] === "File").map((n) => [n["@id"] as string, n.sha256 as string])
+  );
+
+  for (const [path, content] of built.files) {
+    // Both are generated after the @graph (see the comment in package.ts): ro-crate-metadata.json
+    // can't describe its own bytes, and SHA256SUMS is built last and includes ro-crate-metadata.json's
+    // hash, so the graph can't reference SHA256SUMS's hash without a circular dependency either.
+    if (path === "ro-crate-metadata.json" || path === "SHA256SUMS") continue;
+    assert.ok(hasPart.includes(path), `ro-crate hasPart missing ${path}`);
+    const actualHash = await sha256Hex(content);
+    assert.equal(fileHashes.get(path), actualHash, `ro-crate hash for ${path} does not match packaged bytes`);
   }
 });
 

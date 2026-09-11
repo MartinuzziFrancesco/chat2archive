@@ -11,6 +11,7 @@ import { renderTranscriptMarkdown, renderTranscriptHtml } from "./transcript.js"
 import { renderInteractionMarkdown, type DatasheetNotes } from "./datasheet.js";
 import { generateRoCrateMetadata, type PackagedFile } from "./rocrate.js";
 import { generateDataCiteMetadata, generateZenodoMetadata } from "./datacite.js";
+import { validatePackageFiles } from "./validate.js";
 
 export interface PackageOptions {
   datasheetNotes?: DatasheetNotes;
@@ -119,9 +120,9 @@ export async function buildPackage(record: AirRecord, opts: PackageOptions = {})
 
   textFiles.set("air.json", prettyJson(airJsonOf(finalRecord)));
   textFiles.set("conversation.jsonl", conversationJsonl);
-  textFiles.set("transcript.md", renderTranscriptMarkdown(finalRecord));
-  textFiles.set("transcript.html", renderTranscriptHtml(finalRecord));
-  textFiles.set("INTERACTION.md", renderInteractionMarkdown(finalRecord, opts.datasheetNotes));
+  textFiles.set("transcript.md", renderTranscriptMarkdown(finalRecord, stats));
+  textFiles.set("transcript.html", renderTranscriptHtml(finalRecord, stats));
+  textFiles.set("INTERACTION.md", renderInteractionMarkdown(finalRecord, stats, opts.datasheetNotes));
   textFiles.set("datacite.json", prettyJson(generateDataCiteMetadata(finalRecord)));
   textFiles.set("zenodo.json", prettyJson(generateZenodoMetadata(finalRecord)));
   textFiles.set("README.md", readmeText(finalRecord, stats));
@@ -153,7 +154,25 @@ export async function buildPackage(record: AirRecord, opts: PackageOptions = {})
     files.set(path, encoder.encode(content));
   }
 
+  // Self-check before handing the archive to the caller: a package that fails
+  // its own published schema is a chat2archive bug, not a user-facing warning.
+  const selfCheck = await validatePackageFiles(files);
+  if (!selfCheck.valid) {
+    throw new Error(`Internal error: the built package failed its own validation: ${selfCheck.errors.join("; ")}`);
+  }
+
   return { files, record: finalRecord, stats, warnings };
+}
+
+/** Filesystem/URL-safe slug for a record title, used as the default archive filename. */
+export function slugify(title: string): string {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 60) || "air-record"
+  );
 }
 
 function contentTypeFor(path: string): string {

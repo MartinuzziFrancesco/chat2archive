@@ -5,7 +5,7 @@
 // invented (§13, §26 of instructions.md).
 
 import type { AirRecord } from "./model.js";
-import { computeStats } from "./normalize.js";
+import type { ArchiveStats } from "./normalize.js";
 
 export interface DatasheetNotes {
   motivation?: string;
@@ -15,8 +15,7 @@ export interface DatasheetNotes {
   externalMaterial?: string;
 }
 
-export function renderInteractionMarkdown(record: AirRecord, notes: DatasheetNotes = {}): string {
-  const stats = computeStats(record.events);
+export function renderInteractionMarkdown(record: AirRecord, stats: ArchiveStats, notes: DatasheetNotes = {}): string {
   const modelDescriptions = record.agents
     .map((a) => `- **${a.name ?? a.id}** — model: ${a.model.name ?? "unknown"} (provider: ${a.model.provider ?? "unknown"}, evidence: ${a.model.evidence})`)
     .join("\n");

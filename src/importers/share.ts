@@ -33,6 +33,11 @@ export function claudeShareUrl(input: string): URL {
   return validateShareUrl(input, ["claude.ai"], "Claude (https://claude.ai/share/…)");
 }
 
+/** The conversation id from a validated Claude share URL's `/share/<id>` or `/share/<id>/` path. */
+export function claudeSnapshotId(url: URL): string {
+  return url.pathname.replace(/\/$/, "").split("/").pop()!;
+}
+
 /** Reads a fetch Response body as text, refusing anything past MAX_BYTES. */
 async function readBodyWithLimit(response: Response, what: string): Promise<string> {
   const reader = response.body?.getReader();
@@ -135,7 +140,7 @@ interface ClaudeSnapshot {
  */
 async function fetchClaudeShare(input: string): Promise<ImportResult> {
   const url = claudeShareUrl(input);
-  const id = url.pathname.split("/").pop()!;
+  const id = claudeSnapshotId(url);
 
   const pageResponse = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS });
   if (!pageResponse.ok) throw new Error(`The share page returned HTTP ${pageResponse.status}. Check that the link is public and still available.`);

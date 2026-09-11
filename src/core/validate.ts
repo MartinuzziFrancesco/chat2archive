@@ -36,19 +36,21 @@ export async function validatePackageFiles(files: Map<string, Uint8Array>): Prom
 
   // air.json
   let airJson: any;
+  let airJsonParsed = false;
   try {
     airJson = JSON.parse(text("air.json"));
+    airJsonParsed = true;
   } catch (e) {
     errors.push(`air.json is not valid JSON: ${(e as Error).message}`);
   }
-  if (airJson) {
+  if (airJsonParsed) {
     if (!validateAirJson(airJson)) {
       for (const err of validateAirJson.errors ?? []) {
         errors.push(`air.json schema violation at ${err.instancePath || "/"}: ${err.message}`);
       }
     }
-    if (!SUPPORTED_AIR_VERSIONS.includes(airJson.air_version)) {
-      errors.push(`Unsupported AIR version: ${airJson.air_version}`);
+    if (!SUPPORTED_AIR_VERSIONS.includes(airJson?.air_version)) {
+      errors.push(`Unsupported AIR version: ${airJson?.air_version}`);
     }
   }
 
@@ -70,7 +72,13 @@ export async function validatePackageFiles(files: Map<string, Uint8Array>): Prom
     }
   }
 
-  const ids = new Set(events.map((e) => e.id));
+  const ids = new Set<string>();
+  for (const event of events) {
+    if (ids.has(event.id)) {
+      errors.push(`Duplicate event id "${event.id}" in conversation.jsonl.`);
+    }
+    ids.add(event.id);
+  }
   for (const event of events) {
     if (event.parent !== null && event.parent !== undefined && !ids.has(event.parent)) {
       errors.push(`Event "${event.id}" has parent "${event.parent}" which does not resolve within this record.`);
@@ -101,13 +109,15 @@ export async function validatePackageFiles(files: Map<string, Uint8Array>): Prom
   const sumLines = text("SHA256SUMS")
     .split("\n")
     .filter((l) => l.trim().length > 0);
+  const summedPaths = new Set<string>();
   for (const line of sumLines) {
     const match = /^([a-f0-9]{64})\s\s(.+)$/.exec(line);
     if (!match) {
-      warnings.push(`SHA256SUMS line does not match "<hash>  <path>" format: "${line}"`);
+      errors.push(`SHA256SUMS line does not match "<hash>  <path>" format: "${line}"`);
       continue;
     }
     const [, expectedHash, path] = match as unknown as [string, string, string];
+    summedPaths.add(path);
     const content = files.get(path);
     if (!content) {
       errors.push(`SHA256SUMS references "${path}" but it is not present in the package.`);
@@ -116,6 +126,11 @@ export async function validatePackageFiles(files: Map<string, Uint8Array>): Prom
     const actualHash = await sha256Hex(content);
     if (actualHash !== expectedHash) {
       errors.push(`Hash mismatch for "${path}": SHA256SUMS says ${expectedHash}, actual is ${actualHash}.`);
+    }
+  }
+  for (const path of files.keys()) {
+    if (path !== "SHA256SUMS" && !summedPaths.has(path)) {
+      errors.push(`SHA256SUMS is missing an entry for "${path}".`);
     }
   }
 
