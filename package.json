@@ -1,0 +1,43 @@
+{
+  "name": "chat2archive",
+  "version": "0.1.0",
+  "description": "Convert AI conversations into a provider-neutral, Zenodo-ready research archive (AIR \u2014 AI Interaction Record).",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinuzziFrancesco/chat2archive.git"
+  },
+  "homepage": "https://martinuzzifrancesco.github.io/chat2archive/",
+  "bugs": "https://github.com/MartinuzziFrancesco/chat2archive/issues",
+  "bin": {
+    "chat2archive": "dist/cli/index.js"
+  },
+  "exports": {
+    "./core": "./dist/core/index.js"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test --import tsx",
+    "typecheck": "tsc --noEmit",
+    "dev:web": "node build.mjs --serve"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

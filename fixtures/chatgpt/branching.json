@@ -1,0 +1,90 @@
+[
+  {
+    "title": "Explaining a result",
+    "create_time": 1757516551.123,
+    "update_time": 1757516600.0,
+    "conversation_id": "conv-fixture-001",
+    "id": "conv-fixture-001",
+    "current_node": "node-4a",
+    "mapping": {
+      "node-root": {
+        "id": "node-root",
+        "message": null,
+        "parent": null,
+        "children": ["node-1"]
+      },
+      "node-1": {
+        "id": "node-1",
+        "message": {
+          "id": "msg-1",
+          "author": { "role": "user", "name": null, "metadata": {} },
+          "create_time": 1757516551.123,
+          "content": { "content_type": "text", "parts": ["Explain this result."] },
+          "metadata": {}
+        },
+        "parent": "node-root",
+        "children": ["node-2"]
+      },
+      "node-2": {
+        "id": "node-2",
+        "message": {
+          "id": "msg-2",
+          "author": { "role": "assistant", "name": null, "metadata": {} },
+          "create_time": 1757516555.0,
+          "content": { "content_type": "text", "parts": ["The result suggests a positive correlation."] },
+          "metadata": { "model_slug": "gpt-4o" }
+        },
+        "parent": "node-1",
+        "children": ["node-3a", "node-3b"]
+      },
+      "node-3a": {
+        "id": "node-3a",
+        "message": {
+          "id": "msg-3a",
+          "author": { "role": "user", "name": null, "metadata": {} },
+          "create_time": 1757516560.0,
+          "content": { "content_type": "text", "parts": ["Can you say more about the effect size?"] },
+          "metadata": {}
+        },
+        "parent": "node-2",
+        "children": ["node-4a"]
+      },
+      "node-4a": {
+        "id": "node-4a",
+        "message": {
+          "id": "msg-4a",
+          "author": { "role": "assistant", "name": null, "metadata": {} },
+          "create_time": 1757516565.0,
+          "content": { "content_type": "text", "parts": ["The effect size (Cohen's d) is approximately 0.6."] },
+          "metadata": { "model_slug": "gpt-4o" }
+        },
+        "parent": "node-3a",
+        "children": []
+      },
+      "node-3b": {
+        "id": "node-3b",
+        "message": {
+          "id": "msg-3b",
+          "author": { "role": "user", "name": null, "metadata": {} },
+          "create_time": 1757516570.0,
+          "content": { "content_type": "text", "parts": ["Actually, what dataset was this?"] },
+          "metadata": {}
+        },
+        "parent": "node-2",
+        "children": ["node-4b"]
+      },
+      "node-4b": {
+        "id": "node-4b",
+        "message": {
+          "id": "msg-4b",
+          "author": { "role": "assistant", "name": null, "metadata": {} },
+          "create_time": 1757516575.0,
+          "content": { "content_type": "text", "parts": ["This example does not reference a real dataset."] },
+          "metadata": { "model_slug": "gpt-4o" }
+        },
+        "parent": "node-3b",
+        "children": []
+      }
+    }
+  }
+]

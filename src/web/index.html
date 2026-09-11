@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chat2archive — archive an AI conversation for research</title>
+<meta name="description" content="Turn a ChatGPT or Claude conversation into a provider-neutral, Zenodo-ready research archive. Import a public ChatGPT link, a transcript, or a provider export.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="page">
+  <section class="intro" aria-labelledby="page-title">
+    <h1 id="page-title">
+      <svg class="brand-mark" width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="12" y="8" width="40" height="24" rx="9" fill="currentColor"/>
+        <path d="M26 32 L34 32 L29 40 Z" fill="currentColor"/>
+        <rect x="20" y="43" width="24" height="4" rx="2" fill="currentColor"/>
+        <path d="M14 51 V57 Q14 59 16 59 H48 Q50 59 50 57 V51" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>chat<span class="brand-number">2</span>archive</span>
+    </h1>
+  </section>
+
+  <form id="convert-form" class="card">
+    <div class="section-heading"><h2>Add your conversation</h2></div>
+    <label class="field">
+      <span>Paste a conversation link or transcript</span>
+      <textarea id="paste-input" rows="3" placeholder="https://chatgpt.com/share/…"></textarea>
+    </label>
+
+    <div class="or-divider"><span>or</span></div>
+
+    <label class="dropzone" id="dropzone" for="file-input">
+      <svg class="upload-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
+      <span class="dropzone-title">Drop an export here, or <u>browse files</u></span>
+      <span class="dropzone-hint">ChatGPT or Claude · ZIP, JSON, or plain text</span>
+      <span class="dropzone-filename" id="dropzone-filename" hidden></span>
+      <input id="file-input" type="file" accept=".json,.zip,.txt">
+    </label>
+
+    <button id="clear-file-btn" class="text-button" type="button" hidden>Remove selected file</button>
+
+    <details class="advanced">
+      <summary>Add archive details <span class="optional">Optional</span></summary>
+      <div class="advanced-grid">
+        <label>Title <input id="meta-title" type="text" placeholder="Auto-detected from source"></label>
+        <label>Creator name <input id="meta-creator" type="text"></label>
+        <label>ORCID <input id="meta-orcid" type="text" placeholder="0000-0000-0000-0000"></label>
+        <label>License (SPDX) <input id="meta-license" type="text" placeholder="e.g. CC-BY-4.0"></label>
+        <label>Keywords <input id="meta-keywords" type="text" placeholder="comma, separated"></label>
+        <label>Related DOI <input id="meta-related-doi" type="text" placeholder="10.5281/zenodo…"></label>
+        <label class="wide">Description <textarea id="meta-description" rows="2"></textarea></label>
+      </div>
+    </details>
+
+    <div class="submit-row"><button id="create-btn" type="submit">Create archive <span aria-hidden="true">↗</span></button></div>
+    <p class="error" id="error-box" role="alert" hidden></p>
+  </form>
+
+  <section id="result" class="card" aria-labelledby="result-title" tabindex="-1" hidden>
+    <div class="section-heading"><h2 id="result-title">Your archive is ready</h2><span>02 / Download</span></div>
+    <p id="archive-title" class="archive-title"></p>
+    <ul class="stats">
+      <li><span id="stat-messages"></span> messages</li>
+      <li><span id="stat-branches"></span> branches</li>
+      <li><span id="stat-attachments"></span> attachments</li>
+    </ul>
+    <div id="warnings" class="notice" hidden><h3>Capture notes</h3><ul id="warning-list"></ul></div>
+    <details class="archive-details"><summary>Record details &amp; integrity</summary>
+    <table class="meta-table">
+      <tr><th>Provider</th><td id="meta-provider"></td></tr>
+      <tr><th>Model</th><td id="meta-model"></td></tr>
+      <tr><th>Model evidence</th><td id="meta-evidence"></td></tr>
+      <tr><th>Capture</th><td id="meta-capture"></td></tr>
+      <tr>
+        <th>Integrity</th>
+        <td>
+          <code id="meta-hash"></code>
+          <button type="button" id="copy-hash-btn" class="copy-button">Copy</button>
+        </td>
+      </tr>
+    </table>
+    </details>
+    <a id="download-link" class="button" download>Download Zenodo-ready ZIP</a>
+    <p class="hint">Next: upload the ZIP to <a href="https://zenodo.org/deposit/new" target="_blank" rel="noopener">Zenodo</a>.</p>
+  </section>
+
+  <footer>
+    <nav aria-label="Project resources">
+    <a href="https://github.com/MartinuzziFrancesco/chat2archive#cli">CLI</a> ·
+    <a href="https://github.com/MartinuzziFrancesco/chat2archive/blob/main/docs/AIR-0.1.md">format specification</a> ·
+    <a href="https://github.com/MartinuzziFrancesco/chat2archive">GitHub</a>
+    </nav>
+  </footer>
+</main>
+<script type="module" src="bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+User: What's a good first step for archiving an AI conversation?
+
+Assistant: Start by exporting the conversation from the provider in its
+official format, since that gives the strongest capture provenance.
+
+User: And if I don't have an export, just a copy-pasted chat log?
+
+Assistant: That still works, but it is recorded as the weakest capture
+provenance class, since message boundaries and roles have to be inferred
+from plain text rather than observed directly.

@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use chat2archive, please cite it as below."
+title: "chat2archive"
+type: software
+version: 0.1.0
+date-released: 2026-09-10
+license: MIT
+repository-code: "https://github.com/MartinuzziFrancesco/chat2archive"
+abstract: >
+  chat2archive converts AI chat conversations (ChatGPT, Claude, and generic
+  transcripts) into AIR (AI Interaction Record): a provider-neutral,
+  RO-Crate-based archival package suitable for deposit on Zenodo.
+keywords:
+  - AI interaction record
+  - RO-Crate
+  - research data management
+  - provenance
+  - Zenodo

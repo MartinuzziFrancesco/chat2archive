@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://chat2archive.dev/schema/air-0.1.schema.json",
+  "title": "AIR air.json (AI Interaction Record, version 0.1)",
+  "type": "object",
+  "required": [
+    "air_version",
+    "title",
+    "creator",
+    "conversation_created_at",
+    "capture_created_at",
+    "provider",
+    "source_uri",
+    "license",
+    "capture",
+    "agents",
+    "canonical_sha256"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "air_version": { "const": "0.1" },
+    "title": { "type": "string" },
+    "creator": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "orcid": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "conversation_created_at": { "type": ["string", "null"], "format": "date-time" },
+    "capture_created_at": { "type": "string", "format": "date-time" },
+    "provider": { "type": ["string", "null"] },
+    "source_uri": { "type": ["string", "null"] },
+    "license": { "type": ["string", "null"] },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "description": { "type": ["string", "null"] },
+    "selection": { "enum": ["full", "branch", "excerpt"] },
+    "capture": {
+      "type": "object",
+      "required": ["class", "source_uri", "captured_at", "capture_software"],
+      "additionalProperties": false,
+      "properties": {
+        "class": { "enum": ["AIR-C0", "AIR-C1", "AIR-C2", "AIR-C3", "AIR-C4"] },
+        "source_uri": { "type": ["string", "null"] },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "capture_software": { "type": "string" }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "model"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": ["string", "null"] },
+          "model": {
+            "type": "object",
+            "required": ["name", "provider", "evidence"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": ["string", "null"] },
+              "provider": { "type": ["string", "null"] },
+              "evidence": {
+                "enum": [
+                  "api_response",
+                  "provider_export",
+                  "displayed_in_ui",
+                  "share_page",
+                  "user_reported",
+                  "inferred",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "related": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["relation", "identifier"],
+        "additionalProperties": false,
+        "properties": {
+          "relation": {
+            "enum": [
+              "continuedFrom",
+              "isVersionOf",
+              "hasVersion",
+              "isDerivedFrom",
+              "isSourceOf",
+              "relatedPublication"
+            ]
+          },
+          "identifier": { "type": "string" }
+        }
+      }
+    },
+    "canonical_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

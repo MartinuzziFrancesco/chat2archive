@@ -1,0 +1,7 @@
+name = "chat2archive-share"
+main = "src/worker/index.ts"
+compatibility_date = "2024-09-01"
+
+# After the first `wrangler deploy` (or the worker.yml CI run), Cloudflare
+# prints this Worker's URL: https://chat2archive-share.<your-subdomain>.workers.dev
+# Paste that into SHARE_API_URL in src/web/main.ts — see README.md.

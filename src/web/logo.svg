@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="chat2archive logo">
+  <rect x="12" y="8" width="40" height="24" rx="9" fill="#fff"/>
+  <path d="M26 32 L34 32 L29 40 Z" fill="#fff"/>
+  <rect x="20" y="43" width="24" height="4" rx="2" fill="#fff"/>
+  <path d="M14 51 V57 Q14 59 16 59 H48 Q50 59 50 57 V51" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
