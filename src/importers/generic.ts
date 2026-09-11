@@ -20,21 +20,7 @@ const ROLE_LABELS: Record<string, Role> = {
   system: "system",
 };
 
-const LABEL_LINE = /^\s*([A-Za-z][A-Za-z0-9 _-]{0,20}):\s?(.*)$/;
-
-/**
- * Drops fully-blank lines from the start/end of a message's buffered lines
- * without touching leading/trailing whitespace *within* a real line (e.g. an
- * indented code block as the first line of a message) — unlike a plain
- * `.trim()` on the joined string, which strips that indentation too.
- */
-function trimBlankLines(lines: string[]): string[] {
-  let start = 0;
-  let end = lines.length;
-  while (start < end && lines[start]!.trim().length === 0) start++;
-  while (end > start && lines[end - 1]!.trim().length === 0) end--;
-  return lines.slice(start, end);
-}
+const LABEL_LINE = /^\s*([A-Za-z][A-Za-z0-9 _-]{0,20}): ?(.*)$/;
 
 export function importGenericTranscript(text: string, opts: { sourceUri?: string | null } = {}): ImportResult {
   const warnings: string[] = [];
@@ -48,10 +34,9 @@ export function importGenericTranscript(text: string, opts: { sourceUri?: string
 
   const flush = () => {
     if (currentRole === null) return;
-    const trimmed = trimBlankLines(buffer);
+    const content = buffer.join("\n");
     buffer = [];
-    if (trimmed.length === 0) return;
-    const content = trimmed.join("\n");
+    if (content.length === 0) return;
     index += 1;
     const eventId = `msg-${String(index).padStart(3, "0")}`;
     const event: MessageEvent = {
@@ -76,10 +61,10 @@ export function importGenericTranscript(text: string, opts: { sourceUri?: string
       buffer.push(match[2] ?? "");
     } else if (currentRole !== null) {
       buffer.push(line);
-    } else if (line.trim().length > 0) {
+    } else {
       // Text before any recognized role label: treat the whole transcript
       // as a single user-supplied block rather than discarding it.
-      currentRole = "user";
+      if (line.trim().length > 0) currentRole = "user";
       buffer.push(line);
     }
   }

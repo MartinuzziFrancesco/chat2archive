@@ -4,7 +4,8 @@
 
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
-import { unzipSync } from "fflate";
+import { unzipBounded } from "./input.js";
+import { validateEventGraph } from "./normalize.js";
 import { AIR_SCHEMA } from "./schema.js";
 import { sha256Hex, canonicalEventsJsonl } from "./hash.js";
 import type { AirEvent } from "./model.js";
@@ -72,18 +73,7 @@ export async function validatePackageFiles(files: Map<string, Uint8Array>): Prom
     }
   }
 
-  const ids = new Set<string>();
-  for (const event of events) {
-    if (ids.has(event.id)) {
-      errors.push(`Duplicate event id "${event.id}" in conversation.jsonl.`);
-    }
-    ids.add(event.id);
-  }
-  for (const event of events) {
-    if (event.parent !== null && event.parent !== undefined && !ids.has(event.parent)) {
-      errors.push(`Event "${event.id}" has parent "${event.parent}" which does not resolve within this record.`);
-    }
-  }
+  errors.push(...validateEventGraph(events));
 
   // canonical hash cross-check
   if (airJson?.canonical_sha256) {
@@ -149,7 +139,7 @@ export async function validatePackageFiles(files: Map<string, Uint8Array>): Prom
 
 /** Unzips `zipBytes` (an air-record ZIP, with or without a single wrapping directory) into a validate-ready file map. */
 export function filesFromZip(zipBytes: Uint8Array): Map<string, Uint8Array> {
-  const unzipped = unzipSync(zipBytes);
+  const unzipped = unzipBounded(zipBytes);
   const entries = Object.entries(unzipped);
   const commonPrefix = findCommonDirPrefix(entries.map(([p]) => p));
   const files = new Map<string, Uint8Array>();

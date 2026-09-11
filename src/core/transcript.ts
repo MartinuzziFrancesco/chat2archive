@@ -1,5 +1,5 @@
 import type { AirEvent, AirRecord } from "./model.js";
-import type { ArchiveStats } from "./normalize.js";
+import { computeStats, type ArchiveStats } from "./normalize.js";
 
 function agentName(record: AirRecord, agentId?: string | null): string | null {
   if (!agentId) return null;
@@ -17,7 +17,7 @@ function roleLabel(role: string): string {
   return { user: "User", assistant: "Assistant", system: "System", tool: "Tool" }[role] ?? role;
 }
 
-export function renderTranscriptMarkdown(record: AirRecord, stats: ArchiveStats): string {
+export function renderTranscriptMarkdown(record: AirRecord, stats: ArchiveStats = computeStats(record.events)): string {
   const branchStarts = stats.branchStarts;
   const lines: string[] = [];
 
@@ -39,9 +39,10 @@ export function renderTranscriptMarkdown(record: AirRecord, stats: ArchiveStats)
   lines.push("");
 
   for (const event of record.events) {
+    if (branchStarts.has(event.id)) lines.push("_↳ branch point_");
     switch (event.type) {
       case "message": {
-        if (branchStarts.has(event.id)) lines.push("_↳ branch point_");
+
         const who = event.role === "assistant" ? agentName(record, event.agent) ?? roleLabel(event.role) : roleLabel(event.role);
         lines.push(`**${who}**${event.timestamp ? ` — ${event.timestamp}` : ""}`);
         lines.push("");
@@ -126,16 +127,17 @@ header p { color: #555; font-size: 0.9rem; }
 footer { border-top: 1px solid #ddd; margin-top: 2rem; padding-top: 1rem; color: #666; font-size: 0.8rem; }
 `;
 
-export function renderTranscriptHtml(record: AirRecord, stats: ArchiveStats): string {
+export function renderTranscriptHtml(record: AirRecord, stats: ArchiveStats = computeStats(record.events)): string {
   const branchStarts = stats.branchStarts;
   const body: string[] = [];
 
   for (const event of record.events) {
+    if (branchStarts.has(event.id)) body.push(`<div class="branch-point">↳ branch point</div>`);
     switch (event.type) {
       case "message": {
         const who = event.role === "assistant" ? agentName(record, event.agent) ?? roleLabel(event.role) : roleLabel(event.role);
         body.push(`<div class="turn ${escapeHtml(event.role)}">`);
-        if (branchStarts.has(event.id)) body.push(`<div class="branch-point">↳ branch point</div>`);
+
         body.push(
           `<div class="who">${escapeHtml(who)}${event.timestamp ? `<span class="when">${escapeHtml(event.timestamp)}</span>` : ""}</div>`
         );

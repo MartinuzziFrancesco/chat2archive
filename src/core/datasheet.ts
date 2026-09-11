@@ -5,7 +5,7 @@
 // invented (§13, §26 of instructions.md).
 
 import type { AirRecord } from "./model.js";
-import type { ArchiveStats } from "./normalize.js";
+import { computeStats, type ArchiveStats } from "./normalize.js";
 
 export interface DatasheetNotes {
   motivation?: string;
@@ -15,7 +15,7 @@ export interface DatasheetNotes {
   externalMaterial?: string;
 }
 
-export function renderInteractionMarkdown(record: AirRecord, stats: ArchiveStats, notes: DatasheetNotes = {}): string {
+export function renderInteractionMarkdown(record: AirRecord, notes: DatasheetNotes = {}, stats: ArchiveStats = computeStats(record.events)): string {
   const modelDescriptions = record.agents
     .map((a) => `- **${a.name ?? a.id}** — model: ${a.model.name ?? "unknown"} (provider: ${a.model.provider ?? "unknown"}, evidence: ${a.model.evidence})`)
     .join("\n");
@@ -71,12 +71,11 @@ ${selectionLine}
 
 ## Modification
 
-None. \`chat2archive\` does not rewrite, correct, summarize, or otherwise alter
-message content during normalization (see the project's fidelity rules).
+${record.capture.class === "AIR-C0" ? "Role labels and one optional separator space are parsed as message boundaries; CRLF is encoded as LF. Message whitespace is otherwise preserved." : "Message content is preserved; source blocks without a dedicated AIR type are retained as JSON in system events."}
 
 ## External material
 
-${notes.externalMaterial ?? `${stats.attachmentCount} attachment(s) referenced in this record; see \`attachments/\` and \`conversation.jsonl\` for details.`}
+${notes.externalMaterial ?? `${stats.attachmentCount} attachment event(s) in this record. Source ZIP file references, when present, list original entry names and sizes in \`conversation.jsonl\`; those file bytes are not included and may belong to other conversations in the source export.`}
 
 ## Intended use
 

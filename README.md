@@ -144,6 +144,11 @@ execute provider scripts. Unavailable or non-public pages and unsupported
 formats fail explicitly. CLI URL imports are not supported yet; use an
 export instead. See `docs/provenance.md` for the capture-provenance model.
 
+Uploads are limited to 20 MiB; ZIPs are limited to 100 MiB expanded and
+1,000 entries. Additional ZIP files are recorded by their original names
+and sizes; their bytes remain in the source export. Unsupported Claude
+content blocks are preserved as source JSON in the canonical event log.
+
 ## Design
 
 - **Fidelity over polish.** `chat2archive` never rewrites, corrects, or

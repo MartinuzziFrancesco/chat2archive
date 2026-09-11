@@ -2,7 +2,7 @@
 // Providers should never have to be chosen manually before detection is
 // attempted (§21 of instructions.md).
 
-import { unzipSync } from "fflate";
+import { checkInputSize, unzipBounded } from "../core/input.js";
 import type { ImportResult } from "../core/model.js";
 import { importChatGptExport, looksLikeChatGptExport } from "./chatgpt.js";
 import { importClaudeExport, looksLikeClaudeExport } from "./claude.js";
@@ -35,12 +35,12 @@ function detectJsonShape(data: unknown): "chatgpt_export" | "claude_export" | "u
   return "unknown";
 }
 
-function findConversationsJson(files: Record<string, Uint8Array>): Uint8Array | null {
+function findConversationsJson(files: Record<string, Uint8Array>): [string, Uint8Array] | null {
   const entries = Object.entries(files);
   const byName = entries.find(([name]) => /(^|\/)conversations\.json$/i.test(name));
-  if (byName) return byName[1];
+  if (byName) return byName;
   const anyJson = entries.find(([name]) => name.toLowerCase().endsWith(".json"));
-  return anyJson ? anyJson[1] : null;
+  return anyJson ?? null;
 }
 
 /**
@@ -54,11 +54,13 @@ export function importAny(
 ): DetectedImportResult {
   let jsonCandidate: unknown | undefined;
   let plainText: string | undefined;
-  let discardedZipFileCount = 0;
+  if (typeof input === "string") checkInputSize(input.length);
+  checkInputSize(typeof input === "string" ? new TextEncoder().encode(input).byteLength : input.byteLength);
+  let zipReferences: { filename: string; size: number }[] = [];
 
   if (input instanceof Uint8Array) {
     if (isZip(input)) {
-      const files = unzipSync(input);
+      const files = unzipBounded(input);
       const found = findConversationsJson(files);
       if (!found) {
         throw new Error(
@@ -66,8 +68,8 @@ export function importAny(
             "Expected an official ChatGPT or Claude data export archive."
         );
       }
-      discardedZipFileCount = Object.keys(files).filter((name) => !name.endsWith("/")).length - 1;
-      jsonCandidate = JSON.parse(new TextDecoder().decode(found));
+      zipReferences = Object.entries(files).filter(([name]) => name !== found[0] && !name.endsWith("/")).map(([filename, bytes]) => ({ filename, size: bytes.byteLength }));
+      jsonCandidate = JSON.parse(new TextDecoder().decode(found[1]));
     } else {
       plainText = new TextDecoder().decode(input);
     }
@@ -96,10 +98,14 @@ export function importAny(
           "Refusing to guess: pass a plain pasted transcript instead if this is not an official export."
       );
     }
-    if (discardedZipFileCount > 0) {
-      result.warnings.push({
-        message: `The export ZIP contained ${discardedZipFileCount} additional file(s) (e.g. attachments) alongside conversations.json; chat2archive does not yet extract them into the archive.`,
-      });
+    if (zipReferences.length > 0) {
+      const message = "Additional export ZIP files are referenced by their original entry names and byte sizes; their bytes are not included. These files may belong to other conversations in the export.";
+      let id = "source-zip-files";
+      const ids = new Set(result.record.events.map(event => event.id));
+      while (ids.has(id)) id += "-";
+      result.record.events.push({ id, type: "system_event", label: "Source ZIP file references",
+        detail: JSON.stringify({ note: message, files: zipReferences }) });
+      result.warnings.push({ message });
     }
     return result;
   }

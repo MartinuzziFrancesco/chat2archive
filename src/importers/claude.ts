@@ -91,7 +91,7 @@ export function importClaudeExport(
   // `parent` once every message has been assigned an id, instead of
   // guessing by falling back to whatever event happened to come before it.
   const pendingParentLinks: { msgUuid: string; eventId: string; parentMessageUuid: string | undefined }[] = [];
-  const droppedBlockTypes = new Map<string, number>();
+
 
   for (const msg of messages) {
     const role = msg.sender === "human" ? "user" : "assistant";
@@ -155,10 +155,26 @@ export function importClaudeExport(
         });
         recordEvent(resultEventId);
       } else {
-        droppedBlockTypes.set(block.type, (droppedBlockTypes.get(block.type) ?? 0) + 1);
+        flushMessage();
+        const id = `source-${msg.uuid}-${events.length}`;
+        events.push({ id, type: "system_event", parent: internalPrev,
+          timestamp: msg.created_at ?? null,
+          label: `Source content block: ${block.type}`, detail: JSON.stringify(block) });
+        recordEvent(id);
       }
     }
     flushMessage();
+
+    // Preserve exposed message metadata (including attachment references)
+    // without making provider-specific fields part of the AIR vocabulary.
+    const handled = new Set(["uuid", "text", "sender", "created_at", "content", "parent_message_uuid"]);
+    const metadata = Object.fromEntries(Object.entries(msg).filter(([key]) => !handled.has(key)));
+    if (Object.keys(metadata).length > 0) {
+      const id = `source-metadata-${msg.uuid}`;
+      events.push({ id, type: "system_event", parent: internalPrev,
+        label: "Source message metadata", detail: JSON.stringify(metadata) });
+      recordEvent(id);
+    }
 
     if (firstEventId !== null) {
       pendingParentLinks.push({ msgUuid: msg.uuid, eventId: firstEventId, parentMessageUuid: msg.parent_message_uuid });
@@ -184,21 +200,12 @@ export function importClaudeExport(
     } else {
       const resolved = lastEventIdByMessageUuid.get(parentMessageUuid);
       if (resolved === undefined) {
-        warnings.push(
-          `Message "${msgUuid}" references parent "${parentMessageUuid}" which was not found in this export; recorded it as a root message instead of guessing its place in the conversation.`
-        );
-        event.parent = null;
+        throw new Error(`Message "${msgUuid}" references parent "${parentMessageUuid}" which was not found in this export.`);
       } else {
         event.parent = resolved;
       }
     }
     sequentialPrev = lastEventIdByMessageUuid.get(msgUuid) ?? sequentialPrev;
-  }
-
-  for (const [type, count] of droppedBlockTypes) {
-    warnings.push(
-      `${count} content block(s) of type "${type}" are not yet representable in AIR events and were omitted from this record.`
-    );
   }
 
   const record: AirRecord = {

@@ -122,7 +122,7 @@ export async function buildPackage(record: AirRecord, opts: PackageOptions = {})
   textFiles.set("conversation.jsonl", conversationJsonl);
   textFiles.set("transcript.md", renderTranscriptMarkdown(finalRecord, stats));
   textFiles.set("transcript.html", renderTranscriptHtml(finalRecord, stats));
-  textFiles.set("INTERACTION.md", renderInteractionMarkdown(finalRecord, stats, opts.datasheetNotes));
+  textFiles.set("INTERACTION.md", renderInteractionMarkdown(finalRecord, opts.datasheetNotes, stats));
   textFiles.set("datacite.json", prettyJson(generateDataCiteMetadata(finalRecord)));
   textFiles.set("zenodo.json", prettyJson(generateZenodoMetadata(finalRecord)));
   textFiles.set("README.md", readmeText(finalRecord, stats));

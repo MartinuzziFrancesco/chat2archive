@@ -1,3 +1,4 @@
+import { checkInputSize } from "../core/input.js";
 import { importAny } from "../importers/detect.js";
 import { buildPackage, zipPackage, slugify } from "../core/package.js";
 import type { AirRecord, ImportResult } from "../core/model.js";
@@ -110,22 +111,23 @@ form.addEventListener("submit", async (event) => {
   createBtn.textContent = "Creating…";
   try {
     const file = fileInput.files?.[0] ?? null;
-    const pasted = pasteInput.value.trim();
+    const pasted = pasteInput.value;
 
     let imported;
     if ((fileInput.files?.length ?? 0) > 1) {
       throw new Error("Choose one export file at a time.");
     }
-    if (file && pasted) {
+    if (file && pasted.trim()) {
       throw new Error("Choose one source: remove the selected file or clear the pasted transcript.");
     }
     if (file) {
+      checkInputSize(file.size);
       imported = importAny(new Uint8Array(await file.arrayBuffer()));
-    } else if (/^https?:\/\//i.test(pasted)) {
+    } else if (/^https?:\/\//i.test(pasted.trim())) {
       let response: Response;
       try {
         response = await fetch(
-          `${SHARE_API_URL}?url=${encodeURIComponent(pasted)}`,
+          `${SHARE_API_URL}?url=${encodeURIComponent(pasted.trim())}`,
           { signal: AbortSignal.timeout(35_000) }
         );
       } catch {
@@ -137,7 +139,7 @@ form.addEventListener("submit", async (event) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not fetch the shared conversation.");
       imported = data as ImportResult;
-    } else if (pasted) {
+    } else if (pasted.trim()) {
       imported = importAny(pasted, { sourceUri: null });
     } else {
       throw new Error("Paste a transcript or choose an export file first.");

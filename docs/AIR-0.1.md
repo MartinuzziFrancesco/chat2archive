@@ -152,3 +152,29 @@ This document describes AIR 0.1. Future versions must not silently change
 the meaning of an existing field; a version bump accompanies any breaking
 schema change, with migration notes. Parsers should remain able to read
 older AIR packages when reasonable.
+
+## Import fidelity and limits
+
+Content blocks without a dedicated AIR representation are retained as JSON
+in the `detail` of `system_event` records. Exposed additional Claude message
+metadata, including attachment references, is retained in the same way.
+ZIP imports retain references to additional files by original ZIP entry name
+and uncompressed byte size in a source-file inventory event. Those bytes are
+not copied into the output; a bulk export may contain files belonging to
+other conversations. Keep the original export when those files are needed.
+These inventory entries are references to the source ZIP, not package paths.
+
+ChatGPT imports preserve all rooted components. Missing, contradictory, or
+cyclic graph links fail explicitly. Claude parent links are resolved after
+all messages have been read; unresolved parents fail rather than being
+replaced with roots. Pasted transcripts parse role labels and one optional
+separator space, and encode CRLF as LF; remaining content whitespace is
+preserved. The datasheet records this transformation.
+
+Branch statistics count additional children of each actual parent event,
+including tool events. Independent roots and source-file inventories are
+not counted as conversation forks.
+
+Inputs are limited to 20 MiB. ZIPs are inspected before decompression and
+limited to 100 MiB of declared expanded data and 1,000 entries. Duplicate or
+unsafe entry paths are rejected. These limits also apply to ZIP validation.

@@ -99,12 +99,11 @@ export function importChatGptExport(
   const nodeIds = Object.keys(mapping);
   if (nodeIds.length === 0) throw new Error("ChatGPT export conversation has an empty mapping.");
 
-  // A node is a root if it has no parent, or its parent id doesn't resolve
-  // within this mapping (a dangling reference, which would otherwise make
-  // the node unreachable from anywhere and silently vanish from the archive).
+  // Preserve all roots; dangling links are errors, not inferred roots.
   const roots = nodeIds.filter((id) => {
     const parentId = mapping[id]?.parent;
-    return !parentId || !mapping[parentId];
+    if (parentId && !Object.hasOwn(mapping, parentId)) throw new Error(`Missing ChatGPT parent "${parentId}".`);
+    return !parentId;
   });
   if (roots.length === 0) {
     throw new Error(
@@ -112,28 +111,9 @@ export function importChatGptExport(
     );
   }
 
-  const reachableFrom = (rootId: string): Set<string> => {
-    const seen = new Set<string>();
-    const queue = [rootId];
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      for (const childId of mapping[id]?.children ?? []) {
-        if (!seen.has(childId)) queue.push(childId);
-      }
-    }
-    return seen;
-  };
-
-  // Several exports carry a handful of orphaned/edited-out nodes alongside
-  // the real conversation; the real conversation is the largest connected
-  // component.
-  const mainRoot = roots.reduce((best, id) => (reachableFrom(id).size > reachableFrom(best).size ? id : best));
-
   const events: AirEvent[] = [];
   const visited = new Set<string>();
-  const stack: { nodeId: string; parentEventId: string | null }[] = [{ nodeId: mainRoot, parentEventId: null }];
+  const stack: { nodeId: string; parentEventId: string | null }[] = roots.slice().reverse().map(nodeId => ({ nodeId, parentEventId: null }));
 
   while (stack.length > 0) {
     const { nodeId, parentEventId } = stack.pop()!;
@@ -143,8 +123,8 @@ export function importChatGptExport(
       );
     }
     visited.add(nodeId);
-    const node = mapping[nodeId];
-    if (!node) continue;
+    const node = Object.hasOwn(mapping, nodeId) ? mapping[nodeId] : undefined;
+    if (!node) throw new Error(`Missing ChatGPT child node "${nodeId}".`);
     let thisEventParent = parentEventId;
 
     const msg = node.message;
@@ -171,6 +151,11 @@ export function importChatGptExport(
       const tb = mapping[b]?.message?.create_time ?? 0;
       return ta - tb;
     });
+    for (const childId of children) {
+      const child = Object.hasOwn(mapping, childId) ? mapping[childId] : undefined;
+      if (!child) throw new Error(`Missing ChatGPT child node "${childId}".`);
+      if (child.parent !== nodeId) throw new Error(`Inconsistent ChatGPT parent/child links for "${childId}".`);
+    }
     for (let i = children.length - 1; i >= 0; i--) {
       stack.push({ nodeId: children[i]!, parentEventId: thisEventParent });
     }
@@ -180,10 +165,8 @@ export function importChatGptExport(
     throw new Error("ChatGPT export conversation contained no renderable messages.");
   }
 
-  if (visited.size < nodeIds.length) {
-    warnings.push(
-      `${nodeIds.length - visited.size} node(s) in this ChatGPT export were not reachable from the main conversation and were not included in this archive.`
-    );
+  if (nodeIds.some(id => !visited.has(id))) {
+    throw new Error("ChatGPT export contains unreachable nodes (a cycle or inconsistent parent/child links).");
   }
 
   const record: AirRecord = {
