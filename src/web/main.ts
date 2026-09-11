@@ -6,7 +6,7 @@ import type { AirRecord, ImportResult } from "../core/model.js";
 // this itself — no server, and the browser can't read a cross-origin fetch
 // of chatgpt.com directly). Deploy src/worker/ with wrangler, then replace
 // this with the URL it prints. See README.md "Share-link support".
-const SHARE_API_URL = "https://chat2archive-share.YOUR-SUBDOMAIN.workers.dev/api/share";
+const SHARE_API_URL = "https://chat2archive-share.martinuzzi-francesco.workers.dev/api/share";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
