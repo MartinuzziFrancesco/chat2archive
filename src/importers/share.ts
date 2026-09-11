@@ -38,6 +38,17 @@ export function claudeSnapshotId(url: URL): string {
   return url.pathname.replace(/\/$/, "").split("/").pop()!;
 }
 
+// Cloudflare Workers' fetch only implements redirect modes "follow" and
+// "manual" — "error" (what we actually want: never silently follow a
+// redirect to an unvalidated URL) throws at the edge as an unsupported
+// option. Use "manual" everywhere instead and reject a redirect response
+// ourselves, which is available in both Node and Workers.
+export function rejectIfRedirected(response: Response, what: string): void {
+  if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    throw new Error(`The ${what} redirected unexpectedly; the link may have moved, expired, or require sign-in.`);
+  }
+}
+
 /** Reads a fetch Response body as text, refusing anything past MAX_BYTES. */
 async function readBodyWithLimit(response: Response, what: string): Promise<string> {
   const reader = response.body?.getReader();
@@ -116,7 +127,8 @@ function markAsPublicShare(imported: ImportResult): ImportResult {
 
 async function fetchChatGptShare(input: string): Promise<ImportResult> {
   const url = chatGptShareUrl(input);
-  const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS });
+  const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS });
+  rejectIfRedirected(response, "share page");
   if (!response.ok) throw new Error(`The share page returned HTTP ${response.status}. Check that the link is public and still available.`);
   const html = await readBodyWithLimit(response, "share page");
   return importChatGptSharePage(html, url.href);
@@ -142,7 +154,8 @@ async function fetchClaudeShare(input: string): Promise<ImportResult> {
   const url = claudeShareUrl(input);
   const id = claudeSnapshotId(url);
 
-  const pageResponse = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS });
+  const pageResponse = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS });
+  rejectIfRedirected(pageResponse, "share page");
   if (!pageResponse.ok) throw new Error(`The share page returned HTTP ${pageResponse.status}. Check that the link is public and still available.`);
   await pageResponse.body?.cancel();
   const cfCookie = extractCfBmCookie(pageResponse.headers);
@@ -151,10 +164,11 @@ async function fetchClaudeShare(input: string): Promise<ImportResult> {
   apiUrl.searchParams.set("rendering_mode", "messages");
   apiUrl.searchParams.set("render_all_tools", "true");
   const apiResponse = await fetch(apiUrl, {
-    redirect: "error",
+    redirect: "manual",
     signal: AbortSignal.timeout(30_000),
     headers: { ...FETCH_HEADERS, Accept: "application/json", ...(cfCookie ? { Cookie: cfCookie } : {}) },
   });
+  rejectIfRedirected(apiResponse, "share API");
   if (apiResponse.status === 401 || apiResponse.status === 403) {
     throw new Error("This conversation isn't public, or the link has expired.");
   }

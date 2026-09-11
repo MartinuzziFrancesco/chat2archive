@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { importChatGptSharePage, importClaudeSnapshot, chatGptShareUrl, claudeShareUrl, claudeSnapshotId, fetchShare } from "../src/importers/share.js";
+import { importChatGptSharePage, importClaudeSnapshot, chatGptShareUrl, claudeShareUrl, claudeSnapshotId, rejectIfRedirected, fetchShare } from "../src/importers/share.js";
 import { buildPackage, zipPackage } from "../src/core/package.js";
 import { filesFromZip, validatePackageFiles } from "../src/core/validate.js";
 
@@ -107,4 +107,11 @@ test("claudeShareUrl strips tracking params and validates the path", () => {
 test("claudeSnapshotId extracts the id with or without a trailing slash", () => {
   assert.equal(claudeSnapshotId(claudeShareUrl(claudeUrl)), "077c2a1f-16a9-409a-b376-6b002689d007");
   assert.equal(claudeSnapshotId(claudeShareUrl(claudeUrl + "/")), "077c2a1f-16a9-409a-b376-6b002689d007");
+});
+
+test("rejectIfRedirected rejects a redirect response but accepts a normal one", () => {
+  assert.throws(() => rejectIfRedirected(new Response(null, { status: 302 }), "share page"), /redirected unexpectedly/);
+  assert.throws(() => rejectIfRedirected(new Response(null, { status: 301 }), "share page"), /redirected unexpectedly/);
+  rejectIfRedirected(new Response(null, { status: 200 }), "share page");
+  rejectIfRedirected(new Response(null, { status: 404 }), "share page");
 });
