@@ -1,7 +1,7 @@
 {
   "name": "chat2archive",
   "version": "0.1.0",
-  "description": "Convert AI conversations into a provider-neutral, Zenodo-ready research archive (AIR \u2014 AI Interaction Record).",
+  "description": "Convert AI conversations into a provider-neutral, Zenodo-ready research archive (AIR — AI Interaction Record).",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -34,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "esbuild": "^0.24.2",
+    "marked": "^18.0.12",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },

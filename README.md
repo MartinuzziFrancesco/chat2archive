@@ -123,8 +123,10 @@ SHA256SUMS               integrity hashes for every file in the package
 README.md
 ```
 
-See `docs/AIR-0.1.md` for the full format specification and
-`docs/zenodo.md` for how to upload the result to Zenodo.
+See `docs/AIR-0.1.md` (also browsable at
+<https://martinuzzifrancesco.github.io/chat2archive/spec.html>) for the full
+format specification, and `docs/zenodo.md` for how to upload the result to
+Zenodo.
 
 ## Supported inputs
 
