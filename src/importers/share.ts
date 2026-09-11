@@ -131,7 +131,10 @@ async function fetchChatGptShare(input: string): Promise<ImportResult> {
   rejectIfRedirected(response, "share page");
   if (!response.ok) {
     const diag = ["cf-mitigated", "server", "cf-ray", "content-type"].map((h) => `${h}=${response.headers.get(h)}`).join(" ");
-    const bodySnippet = (await readBodyWithLimit(response, "share page").catch(() => "")).slice(0, 3000);
+    const fullBody = await readBodyWithLimit(response, "share page").catch(() => "");
+    const messageMatch = /<div class="message">([\s\S]*?)<\/div>/.exec(fullBody);
+    const explanationMatch = /<div class="explanation">([\s\S]*?)<\/div>/.exec(fullBody);
+    const bodySnippet = `message=${messageMatch?.[1]?.replace(/<[^>]+>/g, "").trim()} explanation=${explanationMatch?.[1]?.replace(/<[^>]+>/g, "").trim()} len=${fullBody.length}`;
     throw new Error(`DIAG ${response.status} [${diag}] BODY: ${bodySnippet}`);
   }
   const html = await readBodyWithLimit(response, "share page");
