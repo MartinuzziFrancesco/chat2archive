@@ -129,7 +129,11 @@ async function fetchChatGptShare(input: string): Promise<ImportResult> {
   const url = chatGptShareUrl(input);
   const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS });
   rejectIfRedirected(response, "share page");
-  if (!response.ok) throw new Error(`The share page returned HTTP ${response.status}. Check that the link is public and still available.`);
+  if (!response.ok) {
+    const diag = ["cf-mitigated", "server", "cf-ray", "content-type"].map((h) => `${h}=${response.headers.get(h)}`).join(" ");
+    const bodySnippet = (await readBodyWithLimit(response, "share page").catch(() => "")).slice(0, 400);
+    throw new Error(`DIAG ${response.status} [${diag}] BODY: ${bodySnippet}`);
+  }
   const html = await readBodyWithLimit(response, "share page");
   return importChatGptSharePage(html, url.href);
 }
